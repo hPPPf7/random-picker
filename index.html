@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <title>三人抽選器（含技能+名次輸入）</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 2rem;
+        background-color: #fdfdfd;
+        text-align: center;
+      }
+      .result,
+      .history {
+        margin-top: 1.5rem;
+        font-size: 1.1rem;
+        color: #333;
+      }
+      .history {
+        text-align: left;
+        margin: 2rem auto;
+        width: fit-content;
+        max-width: 90%;
+      }
+      button {
+        padding: 0.6rem 1.2rem;
+        font-size: 1rem;
+        margin: 0.5rem;
+        cursor: pointer;
+      }
+      input {
+        padding: 0.4rem;
+        font-size: 1rem;
+        width: 100px;
+        margin: 0.5rem;
+      }
+      .history-entry {
+        margin-bottom: 1rem;
+        border-bottom: 1px dashed #aaa;
+        padding-bottom: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🎲 三人抽選器（含技能 + 名次輸入）</h1>
+    <p>為 1號、2號、3號各抽一位角色，並隨機附上 1 個小技能(F) 和 1 個大招(V)</p>
+    <button onclick="draw()">抽選！</button>
+
+    <div class="result" id="result"></div>
+
+    <div id="rankInputArea" style="display: none">
+      <p>請輸入此隊伍的名次：</p>
+      <input type="text" id="rankInput" placeholder="名次" />
+      <button onclick="saveWithRank()">記錄名次</button>
+    </div>
+
+    <h2>📜 歷史記錄</h2>
+    <button onclick="clearHistory()">🗑️ 清除歷史紀錄</button>
+    <div class="history" id="historyLog"></div>
+
+    <script>
+      const characterSkills = {
+        寧紅夜: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        沈妙: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        天海: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        殷紫萍: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        特木爾: { V: ["V1", "V2", "V3"], F: ["F1", "F2", "F3"] },
+        季滄海: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        土御門胡桃: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        妖刀姬: { V: ["V1", "V2", "V3"], F: ["F1", "F2", "F3"] },
+        崔三娘: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        岳山: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        無塵: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        顧清寒: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        武田信忠: { V: ["V1", "V2", "V3"], F: ["F1", "F2", "F3"] },
+        迦南: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        胡為: { V: ["V1", "V2", "V3"], F: ["F1", "F2", "F3"] },
+        季瑩瑩: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        玉玲瓏: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        哈迪: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        魏輕: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        劉煉: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        張起靈: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        席拉: { V: ["V1", "V2"], F: ["F1", "F2"] },
+        藍夢: { V: ["V1", "V2"], F: ["F1", "F2"] },
+      };
+
+      let currentResultHTML = "";
+
+      function getRandomFromArray(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+      }
+
+      function draw() {
+        const allCharacters = Object.keys(characterSkills);
+        const shuffled = [...allCharacters].sort(() => Math.random() - 0.5);
+        const selected = shuffled.slice(0, 3);
+        const results = selected.map((name, index) => {
+          const skill = characterSkills[name];
+          const vSkill = getRandomFromArray(skill.V);
+          const fSkill = getRandomFromArray(skill.F);
+          return `${index + 1}號：${name}（${fSkill} / ${vSkill}）`;
+        });
+
+        currentResultHTML = results.join("<br>");
+        document.getElementById("result").innerHTML = currentResultHTML;
+        document.getElementById("rankInputArea").style.display = "block";
+        document.getElementById("rankInput").value = "";
+      }
+
+      // 儲存歷史紀錄陣列
+      let historyRecords = [];
+
+      function saveWithRank() {
+        let rankInput = document.getElementById("rankInput").value.trim();
+        let rankLabel = "";
+
+        if (/^\d+$/.test(rankInput)) {
+          rankLabel = `第${rankInput}名`;
+        } else if (rankInput !== "") {
+          rankLabel = rankInput;
+        }
+
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}/${
+          now.getMonth() + 1
+        }/${now.getDate()} ${now.toLocaleTimeString()}`;
+        const fullText = `<strong>${timestamp}${
+          rankLabel ? ` - ${rankLabel}` : ""
+        }</strong><br>${currentResultHTML}`;
+        const entry = { timestamp, rankLabel, html: fullText };
+
+        // 存進記憶體與 localStorage
+        historyRecords.unshift(entry);
+        localStorage.setItem("historyRecords", JSON.stringify(historyRecords));
+
+        // 更新畫面
+        renderHistory();
+        document.getElementById("rankInputArea").style.display = "none";
+        document.getElementById("result").innerHTML = "";
+        currentResultHTML = "";
+      }
+
+      function renderHistory() {
+        const historyLog = document.getElementById("historyLog");
+        historyLog.innerHTML = "";
+        historyRecords.forEach((record) => {
+          const div = document.createElement("div");
+          div.className = "history-entry";
+          div.innerHTML = record.html;
+          historyLog.appendChild(div);
+        });
+      }
+
+      function clearHistory() {
+        if (confirm("確定要清除所有歷史紀錄嗎？此動作無法復原。")) {
+          historyRecords = [];
+          localStorage.removeItem("historyRecords");
+          renderHistory();
+        }
+      }
+
+      // 初始化：從 localStorage 載入
+      window.addEventListener("load", () => {
+        const saved = localStorage.getItem("historyRecords");
+        if (saved) {
+          historyRecords = JSON.parse(saved);
+          renderHistory();
+        }
+      });
+    </script>
+  </body>
+</html>
