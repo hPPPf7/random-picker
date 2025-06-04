@@ -1,63 +1,157 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
   <head>
+    <script>
+      const theme = localStorage.getItem("theme");
+      if (theme === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    </script>
     <meta charset="UTF-8" />
-    <title>三人抽選器（含技能+名次輸入）</title>
+    <title>三人抽選器</title>
     <style>
       body {
-        font-family: sans-serif;
+        font-family: "Segoe UI", sans-serif;
+        background-color: #f9f9fb;
         padding: 2rem;
-        background-color: #fdfdfd;
         text-align: center;
-      }
-      .result,
-      .history {
-        margin-top: 1.5rem;
-        font-size: 1.1rem;
         color: #333;
+        max-width: 600px;
+        margin: auto;
       }
-      .history {
-        text-align: left;
-        margin: 2rem auto;
-        width: fit-content;
-        max-width: 90%;
+      h1 {
+        font-size: 1.8rem;
+        margin-bottom: 1rem;
       }
       button {
         padding: 0.6rem 1.2rem;
         font-size: 1rem;
         margin: 0.5rem;
+        border: none;
+        background-color: #bbb;
+        color: #222;
+        border-radius: 6px;
         cursor: pointer;
+        transition: background-color 0.3s, box-shadow 0.3s;
+      }
+      button:hover {
+        background-color: #999;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       }
       input {
         padding: 0.4rem;
         font-size: 1rem;
-        width: 100px;
+        width: 120px;
         margin: 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+      }
+      .card-container {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 1.5rem;
+        flex-wrap: wrap;
+      }
+      .card {
+        background-color: #fff;
+        border-radius: 10px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        padding: 1.5rem 1rem 1rem;
+        min-width: 150px;
+        text-align: center;
+        font-size: 1.05rem;
+        position: relative;
+      }
+      .card-badge {
+        position: absolute;
+        top: -10px;
+        left: -10px;
+        width: 30px;
+        height: 30px;
+        line-height: 30px;
+        text-align: center;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 0.9rem;
+        color: white;
+      }
+      .line-badge {
+        display: inline-block;
+        width: 1.5em;
+        height: 1.5em;
+        line-height: 1.5em;
+        text-align: center;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 0.85rem;
+        color: white;
+        margin-right: 0.4em;
+      }
+      .badge-1 {
+        background-color: #2ecc71;
+      }
+      .badge-2 {
+        background-color: #9b59b6;
+      }
+      .badge-3 {
+        background-color: #3498db;
+      }
+      .history {
+        margin-top: 2rem;
+        text-align: left;
       }
       .history-entry {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        background-color: #f1f1f1;
+        border-radius: 8px;
+        padding: 0.8rem 1rem;
         margin-bottom: 1rem;
-        border-bottom: 1px dashed #aaa;
-        padding-bottom: 0.5rem;
+        padding-right: 4rem;
+      }
+      .rank-tag {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 1.6rem;
+        font-weight: bold;
+      }
+      body[data-theme="dark"] {
+        background-color: #1e1e1e;
+        color: #f0f0f0;
+      }
+      body[data-theme="dark"] .card,
+      body[data-theme="dark"] .history-entry {
+        background-color: #2a2a2a;
+        color: #f0f0f0;
+      }
+      body[data-theme="dark"] button {
+        background-color: #444;
+        color: #f0f0f0;
+      }
+      body[data-theme="dark"] button:hover {
+        background-color: #666;
       }
     </style>
   </head>
   <body>
-    <h1>🎲 三人抽選器（含技能 + 名次輸入）</h1>
+    <button onclick="toggleTheme()" id="themeToggle">🌙 切換主題</button>
+    <h1>🎲 三人抽選器</h1>
     <p>為 1號、2號、3號各抽一位角色，並隨機附上 1 個小技能(F) 和 1 個大招(V)</p>
     <button onclick="draw()">抽選！</button>
-
-    <div class="result" id="result"></div>
-
+    <div class="card-container" id="result"></div>
     <div id="rankInputArea" style="display: none">
       <p>請輸入此隊伍的名次：</p>
-      <input type="text" id="rankInput" placeholder="名次" />
-      <button onclick="saveWithRank()">記錄名次</button>
+      <input type="text" id="rankInput" placeholder="名次數字或備註" />
+      <button onclick="saveWithRank()">記錄</button>
     </div>
-
     <h2>📜 歷史記錄</h2>
     <button onclick="clearHistory()">🗑️ 清除歷史紀錄</button>
     <div class="history" id="historyLog"></div>
-
     <script>
       const characterSkills = {
         寧紅夜: { V: ["V1", "V2"], F: ["F1", "F2"] },
@@ -86,87 +180,127 @@
       };
 
       let currentResultHTML = "";
+      let historyRecords = [];
 
       function getRandomFromArray(arr) {
         return arr[Math.floor(Math.random() * arr.length)];
       }
 
       function draw() {
-        const allCharacters = Object.keys(characterSkills);
-        const shuffled = [...allCharacters].sort(() => Math.random() - 0.5);
-        const selected = shuffled.slice(0, 3);
-        const results = selected.map((name, index) => {
-          const skill = characterSkills[name];
-          const vSkill = getRandomFromArray(skill.V);
-          const fSkill = getRandomFromArray(skill.F);
-          return `${index + 1}號：${name}（${fSkill} / ${vSkill}）`;
+        const allCharacters = Object.keys(characterSkills)
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 3);
+        const results = allCharacters.map((name, i) => {
+          const v = getRandomFromArray(characterSkills[name].V);
+          const f = getRandomFromArray(characterSkills[name].F);
+          return { name, v, f };
         });
-
-        currentResultHTML = results.join("<br>");
-        document.getElementById("result").innerHTML = currentResultHTML;
+        currentResultHTML = results;
+        localStorage.setItem("currentDraw", JSON.stringify(results));
         document.getElementById("rankInputArea").style.display = "block";
         document.getElementById("rankInput").value = "";
+        document.getElementById("result").innerHTML = results
+          .map(
+            (r, i) =>
+              `<div class="card"><div class="card-badge badge-${i + 1}">${
+                i + 1
+              }</div><div><strong>${r.name}</strong></div><div>${r.f} / ${
+                r.v
+              }</div></div>`
+          )
+          .join("");
       }
 
-      // 儲存歷史紀錄陣列
-      let historyRecords = [];
-
       function saveWithRank() {
-        let rankInput = document.getElementById("rankInput").value.trim();
-        let rankLabel = "";
-
-        if (/^\d+$/.test(rankInput)) {
-          rankLabel = `第${rankInput}名`;
-        } else if (rankInput !== "") {
-          rankLabel = rankInput;
-        }
-
+        const rankVal = document.getElementById("rankInput").value.trim();
+        const rankLabel = /^\d+$/.test(rankVal) ? `第${rankVal}名` : rankVal;
         const now = new Date();
         const timestamp = `${now.getFullYear()}/${
           now.getMonth() + 1
         }/${now.getDate()} ${now.toLocaleTimeString()}`;
-        const fullText = `<strong>${timestamp}${
-          rankLabel ? ` - ${rankLabel}` : ""
-        }</strong><br>${currentResultHTML}`;
-        const entry = { timestamp, rankLabel, html: fullText };
-
-        // 存進記憶體與 localStorage
-        historyRecords.unshift(entry);
+        const record = {
+          timestamp,
+          rank: rankLabel,
+          members: currentResultHTML,
+        };
+        historyRecords.unshift(record);
         localStorage.setItem("historyRecords", JSON.stringify(historyRecords));
-
-        // 更新畫面
-        renderHistory();
-        document.getElementById("rankInputArea").style.display = "none";
-        document.getElementById("result").innerHTML = "";
+        localStorage.removeItem("currentDraw");
         currentResultHTML = "";
+        document.getElementById("result").innerHTML = "";
+        document.getElementById("rankInputArea").style.display = "none";
+        renderHistory();
       }
 
       function renderHistory() {
-        const historyLog = document.getElementById("historyLog");
-        historyLog.innerHTML = "";
+        const log = document.getElementById("historyLog");
+        log.innerHTML = "";
         historyRecords.forEach((record) => {
-          const div = document.createElement("div");
-          div.className = "history-entry";
-          div.innerHTML = record.html;
-          historyLog.appendChild(div);
+          const membersHTML = record.members
+            .map(
+              (m, i) =>
+                `<div><span class="line-badge badge-${i + 1}">${i + 1}</span>${
+                  m.name
+                }（${m.f} / ${m.v}）</div>`
+            )
+            .join("");
+          log.innerHTML += `
+            <div class="history-entry">
+              <div><strong style="font-size: 1rem;">${
+                record.timestamp
+              }</strong></div>
+              ${membersHTML}
+              ${record.rank ? `<div class="rank-tag">${record.rank}</div>` : ""}
+            </div>
+          `;
         });
       }
 
       function clearHistory() {
-        if (confirm("確定要清除所有歷史紀錄嗎？此動作無法復原。")) {
+        if (confirm("確定要清除所有歷史紀錄嗎？")) {
           historyRecords = [];
           localStorage.removeItem("historyRecords");
           renderHistory();
         }
       }
 
-      // 初始化：從 localStorage 載入
+      function toggleTheme() {
+        const next = document.body.dataset.theme === "dark" ? "light" : "dark";
+        document.body.dataset.theme = next;
+        localStorage.setItem("theme", next);
+        updateThemeButton();
+      }
+
+      function updateThemeButton() {
+        const theme = document.body.dataset.theme;
+        document.getElementById("themeToggle").innerText =
+          theme === "dark" ? "☀️ 切換主題" : "🌙 切換主題";
+      }
+
       window.addEventListener("load", () => {
         const saved = localStorage.getItem("historyRecords");
         if (saved) {
           historyRecords = JSON.parse(saved);
           renderHistory();
         }
+        const draw = localStorage.getItem("currentDraw");
+        if (draw) {
+          currentResultHTML = JSON.parse(draw);
+          document.getElementById("result").innerHTML = currentResultHTML
+            .map(
+              (r, i) =>
+                `<div class="card"><div class="card-badge badge-${i + 1}">${
+                  i + 1
+                }</div><div><strong>${r.name}</strong></div><div>${r.f} / ${
+                  r.v
+                }</div></div>`
+            )
+            .join("");
+          document.getElementById("rankInputArea").style.display = "block";
+        }
+        const theme = localStorage.getItem("theme") || "light";
+        document.body.dataset.theme = theme;
+        updateThemeButton();
       });
     </script>
   </body>
