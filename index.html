@@ -239,6 +239,14 @@
       html[data-theme="dark"] #statsArea {
         background-color: #333;
       }
+
+      .left-panel > button {
+        margin-top: 1.65rem; /* 跟右邊的 h2 高度對齊 */
+      }
+
+      .card-container {
+        margin-top: 2.5rem; /* 調整到與右側 entry 對齊 */
+      }
     </style>
   </head>
   <body>
@@ -315,7 +323,9 @@
         藍夢: { V: ["V1", "V2"], F: ["F1", "F2"] },
       };
 
-      let currentResultHTML = "";
+      let currentResultHTML = JSON.parse(
+        localStorage.getItem("currentDraw") || "[]"
+      );
       let historyRecords = [];
 
       function getRandomFromArray(arr) {
@@ -323,31 +333,55 @@
       }
 
       function draw() {
+        const container = document.getElementById("result");
+        container.innerHTML = [0, 1, 2]
+          .map((i) => `<div class="card" id="slot${i}">🎲</div>`)
+          .join("");
+        document.getElementById("rankInputArea").style.display = "none";
+
         const allCharacters = Object.keys(characterSkills)
           .sort(() => Math.random() - 0.5)
-          .slice(0, 3);
-        const results = allCharacters.map((name, i) => {
-          const v = getRandomFromArray(characterSkills[name].V);
-          const f = getRandomFromArray(characterSkills[name].F);
-          return { name, v, f };
+          .slice(0, 3)
+          .map((name) => {
+            const v = getRandomFromArray(characterSkills[name].V);
+            const f = getRandomFromArray(characterSkills[name].F);
+            return { name, v, f };
+          });
+
+        currentResultHTML = allCharacters;
+        localStorage.setItem("currentDraw", JSON.stringify(allCharacters));
+
+        // 動畫：每個 slot 模擬滾動幾次後停下
+        // 動畫：每個 slot 模擬滾動幾次後停下
+        allCharacters.forEach((r, i) => {
+          const slot = document.getElementById(`slot${i}`);
+          let count = 0;
+          const spinInterval = setInterval(() => {
+            const randomName = getRandomFromArray(Object.keys(characterSkills));
+            slot.innerHTML = `<div><strong>${randomName}</strong></div>`;
+            count++;
+            if (count > 10 + i * 4) {
+              clearInterval(spinInterval);
+              slot.innerHTML = `
+        <div class="card-badge badge-${i + 1}">${i + 1}</div>
+        <div><strong>${r.name}</strong></div>
+        <div>${r.f} / ${r.v}</div>`;
+
+              // ✅ 只有最後一個完成時才儲存
+              if (i === 2) {
+                localStorage.setItem(
+                  "currentDraw",
+                  JSON.stringify(allCharacters)
+                );
+              }
+            }
+          }, 80);
         });
 
-        if (results.length === 3) {
-          currentResultHTML = results;
-          localStorage.setItem("currentDraw", JSON.stringify(results));
-        }
-        document.getElementById("rankInputArea").style.display = "block";
-        document.getElementById("rankInput").value = "";
-        document.getElementById("result").innerHTML = results
-          .map(
-            (r, i) =>
-              `<div class="card"><div class="card-badge badge-${i + 1}">${
-                i + 1
-              }</div><div><strong>${r.name}</strong></div><div>${r.f} / ${
-                r.v
-              }</div></div>`
-          )
-          .join("");
+        // 延遲顯示輸入框
+        setTimeout(() => {
+          document.getElementById("rankInputArea").style.display = "block";
+        }, 1400);
       }
 
       function saveWithRank() {
@@ -375,13 +409,11 @@
         historyRecords.unshift(record);
         localStorage.setItem("historyRecords", JSON.stringify(historyRecords));
 
-        currentResultHTML = "";
+        // ✅ 清空抽選結果區
+        currentResultHTML = [];
         localStorage.removeItem("currentDraw");
-
         document.getElementById("result").innerHTML = "";
         document.getElementById("rankInputArea").style.display = "none";
-
-        // 清空欄位
         document.getElementById("rankInput").value = "";
         document.getElementById("noteInput").value = "";
 
@@ -496,26 +528,33 @@
       }
 
       window.addEventListener("load", () => {
+        const draw = localStorage.getItem("currentDraw");
+
+        if (draw) {
+          const restoredDraw = JSON.parse(draw);
+          currentResultHTML = restoredDraw;
+
+          const resultHTML = restoredDraw
+            .map(
+              (r, i) => `
+<div class="card" id="slot${i}">
+  <div class="card-badge badge-${i + 1}">${i + 1}</div>
+  <div><strong>${r.name}</strong></div>
+  <div>${r.f} / ${r.v}</div>
+</div>`
+            )
+            .join("");
+
+          document.getElementById("result").innerHTML = resultHTML;
+          document.getElementById("rankInputArea").style.display = "block";
+        }
+
         const saved = localStorage.getItem("historyRecords");
         if (saved) {
           historyRecords = JSON.parse(saved);
           renderHistory();
         }
-        const draw = localStorage.getItem("currentDraw");
-        if (draw) {
-          currentResultHTML = JSON.parse(draw);
-          document.getElementById("result").innerHTML = currentResultHTML
-            .map(
-              (r, i) =>
-                `<div class="card"><div class="card-badge badge-${i + 1}">${
-                  i + 1
-                }</div><div><strong>${r.name}</strong></div><div>${r.f} / ${
-                  r.v
-                }</div></div>`
-            )
-            .join("");
-          document.getElementById("rankInputArea").style.display = "block";
-        }
+
         const theme = localStorage.getItem("theme") || "light";
         document.documentElement.setAttribute("data-theme", theme);
         updateThemeButton();
